@@ -1,235 +1,248 @@
 <template>
-  <form class="conversation--form w-full" @submit.prevent="onFormSubmit">
-    <div v-if="showNoInboxAlert" class="callout warning">
-      <p>
-        {{ $t('NEW_CONVERSATION.NO_INBOX') }}
-      </p>
-    </div>
-    <div v-else>
-      <div class="gap-2 flex flex-row">
-        <div class="w-[100%]">
-          <label>
-            {{ $t('NEW_CONVERSATION.FORM.INBOX.LABEL') }}
-          </label>
-          <div
-            class="multiselect-wrap--small"
-            :class="{ 'has-multi-select-error': $v.targetInbox.$error }"
-          >
-            <multiselect
-              v-model="targetInbox"
-              track-by="id"
-              label="name"
-              :placeholder="$t('FORMS.MULTISELECT.SELECT')"
-              selected-label=""
-              select-label=""
-              deselect-label=""
-              :max-height="160"
-              :close-on-select="true"
-              :options="[...inboxes]"
-            >
-              <template slot="singleLabel" slot-scope="{ option }">
-                <inbox-dropdown-item
-                  v-if="option.name"
-                  :name="option.name"
-                  :inbox-identifier="computedInboxSource(option)"
-                  :channel-type="option.channel_type"
-                />
-                <span v-else>
-                  {{ $t('NEW_CONVERSATION.FORM.INBOX.PLACEHOLDER') }}
-                </span>
-              </template>
-              <template slot="option" slot-scope="{ option }">
-                <inbox-dropdown-item
-                  :name="option.name"
-                  :inbox-identifier="computedInboxSource(option)"
-                  :channel-type="option.channel_type"
-                />
-              </template>
-            </multiselect>
-          </div>
-          <label :class="{ error: $v.targetInbox.$error }">
-            <span v-if="$v.targetInbox.$error" class="message">
-              {{ $t('NEW_CONVERSATION.FORM.INBOX.ERROR') }}
-            </span>
-          </label>
-        </div>
+  <div class="w-full">
+    <form class="conversation--form w-full" @submit.prevent="onFormSubmit">
+      <div v-if="showNoInboxAlert" class="callout warning">
+        <p>
+          {{ $t('NEW_CONVERSATION.NO_INBOX') }}
+        </p>
       </div>
-      <div class="flex-row">
-        <div class="w-[100%]">
-          <label class="typo__label">{{
-            $t('NEW_CONVERSATION.FORM.TO.LABEL')
-          }}</label>
-          <div class="multiselect-wrap--small">
-            <multiselect
-              v-model="selectedContacts"
-              label="name"
-              track-by="id"
-              placeholder="Search or add a contact"
-              :options="whatsappContacts"
-              :multiple="true"
-              :max-height="300"
-            />
-          </div>
-        </div>
-      </div>
-      <div v-if="isAnEmailInbox" class="w-full">
-        <div class="w-full">
-          <label :class="{ error: $v.subject.$error }">
-            {{ $t('NEW_CONVERSATION.FORM.SUBJECT.LABEL') }}
-            <input
-              v-model="subject"
-              type="text"
-              :placeholder="$t('NEW_CONVERSATION.FORM.SUBJECT.PLACEHOLDER')"
-              @input="$v.subject.$touch"
-            />
-            <span v-if="$v.subject.$error" class="message">
-              {{ $t('NEW_CONVERSATION.FORM.SUBJECT.ERROR') }}
-            </span>
-          </label>
-        </div>
-      </div>
-      <div class="w-full">
-        <div class="w-full">
-          <div class="relative">
-            <canned-response
-              v-if="showCannedResponseMenu && hasSlashCommand"
-              :search-key="cannedResponseSearchKey"
-              @click="replaceTextWithCannedResponse"
-            />
-          </div>
-          <div v-if="isEmailOrWebWidgetInbox">
+      <div v-else>
+        <div class="gap-2 flex flex-row">
+          <div class="w-[100%]">
             <label>
-              {{ $t('NEW_CONVERSATION.FORM.MESSAGE.LABEL') }}
+              {{ $t('NEW_CONVERSATION.FORM.INBOX.LABEL') }}
             </label>
-            <reply-email-head
-              v-if="isAnEmailInbox"
-              :cc-emails.sync="ccEmails"
-              :bcc-emails.sync="bccEmails"
-            />
-            <div class="editor-wrap">
-              <woot-message-editor
-                v-model="message"
-                class="message-editor"
-                :class="{ editor_warning: $v.message.$error }"
-                :enable-variables="true"
-                :signature="signatureToApply"
-                :allow-signature="true"
-                :placeholder="$t('NEW_CONVERSATION.FORM.MESSAGE.PLACEHOLDER')"
-                @toggle-canned-menu="toggleCannedMenu"
-                @blur="$v.message.$touch"
-              >
-                <template #footer>
-                  <message-signature-missing-alert
-                    v-if="isSignatureEnabledForInbox && !messageSignature"
-                    class="!mx-0 mb-1"
-                  />
-                  <div v-if="isAnEmailInbox" class="mb-3 mt-px">
-                    <woot-button
-                      v-tooltip.top-end="signatureToggleTooltip"
-                      icon="signature"
-                      color-scheme="secondary"
-                      variant="smooth"
-                      size="small"
-                      :title="signatureToggleTooltip"
-                      @click.prevent="toggleMessageSignature"
-                    />
-                  </div>
-                </template>
-              </woot-message-editor>
-              <span v-if="$v.message.$error" class="editor-warning__message">
-                {{ $t('NEW_CONVERSATION.FORM.MESSAGE.ERROR') }}
-              </span>
-            </div>
-          </div>
-          <whatsapp-templates
-            v-else-if="hasWhatsappTemplates"
-            :inbox-id="selectedInbox.inbox.id"
-            @on-select-template="toggleWaTemplate"
-            @on-send="onSendWhatsAppReply"
-          />
-          <label v-else :class="{ error: $v.message.$error }">
-            {{ $t('NEW_CONVERSATION.FORM.MESSAGE.LABEL') }}
-            <textarea
-              v-model="message"
-              class="min-h-[5rem]"
-              type="text"
-              :placeholder="$t('NEW_CONVERSATION.FORM.MESSAGE.PLACEHOLDER')"
-              @input="$v.message.$touch"
-            />
-            <span v-if="$v.message.$error" class="message">
-              {{ $t('NEW_CONVERSATION.FORM.MESSAGE.ERROR') }}
-            </span>
-          </label>
-          <div v-if="isEmailOrWebWidgetInbox" class="flex flex-col">
-            <file-upload
-              ref="uploadAttachment"
-              input-id="newConversationAttachment"
-              :size="4096 * 4096"
-              :accept="allowedFileTypes"
-              :multiple="true"
-              :drop="true"
-              :drop-directory="false"
-              :data="{
-                direct_upload_url: '/rails/active_storage/direct_uploads',
-                direct_upload: true,
-              }"
-              @input-file="onFileUpload"
-            >
-              <woot-button
-                class-names="button--upload"
-                icon="attach"
-                emoji="📎"
-                color-scheme="secondary"
-                variant="smooth"
-                size="small"
-              >
-                {{ $t('NEW_CONVERSATION.FORM.ATTACHMENTS.SELECT') }}
-              </woot-button>
-              <span
-                class="text-slate-500 ltr:ml-1 rtl:mr-1 font-medium text-xs dark:text-slate-400"
-              >
-                {{ $t('NEW_CONVERSATION.FORM.ATTACHMENTS.HELP_TEXT') }}
-              </span>
-            </file-upload>
             <div
-              v-if="hasAttachments"
-              class="max-h-20 overflow-y-auto mb-4 mt-1.5"
+              class="multiselect-wrap--small"
+              :class="{ 'has-multi-select-error': $v.targetInbox.$error }"
             >
-              <attachment-preview
-                class="[&>.preview-item]:dark:bg-slate-700 flex-row flex-wrap gap-x-3 gap-y-1"
-                :attachments="attachedFiles"
-                :remove-attachment="removeAttachment"
+              <multiselect
+                v-model="targetInbox"
+                track-by="id"
+                label="name"
+                :placeholder="$t('FORMS.MULTISELECT.SELECT')"
+                selected-label=""
+                select-label=""
+                deselect-label=""
+                :max-height="160"
+                :close-on-select="true"
+                :options="[...inboxes]"
+              >
+                <template slot="singleLabel" slot-scope="{ option }">
+                  <inbox-dropdown-item
+                    v-if="option.name"
+                    :name="option.name"
+                    :inbox-identifier="computedInboxSource(option)"
+                    :channel-type="option.channel_type"
+                  />
+                  <span v-else>
+                    {{ $t('NEW_CONVERSATION.FORM.INBOX.PLACEHOLDER') }}
+                  </span>
+                </template>
+                <template slot="option" slot-scope="{ option }">
+                  <inbox-dropdown-item
+                    :name="option.name"
+                    :inbox-identifier="computedInboxSource(option)"
+                    :channel-type="option.channel_type"
+                  />
+                </template>
+              </multiselect>
+            </div>
+            <label :class="{ error: $v.targetInbox.$error }">
+              <span v-if="$v.targetInbox.$error" class="message">
+                {{ $t('NEW_CONVERSATION.FORM.INBOX.ERROR') }}
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="flex-row">
+          <div class="w-[100%]">
+            <label class="typo__label">{{
+              $t('NEW_CONVERSATION.FORM.TO.LABEL')
+            }}</label>
+            <div class="multiselect-wrap--small">
+              <multiselect
+                v-model="selectedContacts"
+                label="name"
+                track-by="id"
+                placeholder="Search or add a contact"
+                :options="whatsappContacts"
+                :multiple="true"
+                :max-height="300"
               />
             </div>
           </div>
         </div>
+        <div v-if="isAnEmailInbox" class="w-full">
+          <div class="w-full">
+            <label :class="{ error: $v.subject.$error }">
+              {{ $t('NEW_CONVERSATION.FORM.SUBJECT.LABEL') }}
+              <input
+                v-model="subject"
+                type="text"
+                :placeholder="$t('NEW_CONVERSATION.FORM.SUBJECT.PLACEHOLDER')"
+                @input="$v.subject.$touch"
+              />
+              <span v-if="$v.subject.$error" class="message">
+                {{ $t('NEW_CONVERSATION.FORM.SUBJECT.ERROR') }}
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="w-full">
+          <div class="w-full">
+            <div class="relative">
+              <canned-response
+                v-if="showCannedResponseMenu && hasSlashCommand"
+                :search-key="cannedResponseSearchKey"
+                @click="replaceTextWithCannedResponse"
+              />
+            </div>
+            <div v-if="isEmailOrWebWidgetInbox">
+              <label>
+                {{ $t('NEW_CONVERSATION.FORM.MESSAGE.LABEL') }}
+              </label>
+              <reply-email-head
+                v-if="isAnEmailInbox"
+                :cc-emails.sync="ccEmails"
+                :bcc-emails.sync="bccEmails"
+              />
+              <div class="editor-wrap">
+                <woot-message-editor
+                  v-model="message"
+                  class="message-editor"
+                  :class="{ editor_warning: $v.message.$error }"
+                  :enable-variables="true"
+                  :signature="signatureToApply"
+                  :allow-signature="true"
+                  :placeholder="$t('NEW_CONVERSATION.FORM.MESSAGE.PLACEHOLDER')"
+                  @toggle-canned-menu="toggleCannedMenu"
+                  @blur="$v.message.$touch"
+                >
+                  <template #footer>
+                    <message-signature-missing-alert
+                      v-if="isSignatureEnabledForInbox && !messageSignature"
+                      class="!mx-0 mb-1"
+                    />
+                    <div v-if="isAnEmailInbox" class="mb-3 mt-px">
+                      <woot-button
+                        v-tooltip.top-end="signatureToggleTooltip"
+                        icon="signature"
+                        color-scheme="secondary"
+                        variant="smooth"
+                        size="small"
+                        :title="signatureToggleTooltip"
+                        @click.prevent="toggleMessageSignature"
+                      />
+                    </div>
+                  </template>
+                </woot-message-editor>
+                <span v-if="$v.message.$error" class="editor-warning__message">
+                  {{ $t('NEW_CONVERSATION.FORM.MESSAGE.ERROR') }}
+                </span>
+              </div>
+            </div>
+            <whatsapp-templates
+              v-else-if="hasWhatsappTemplates"
+              :inbox-id="selectedInbox.inbox.id"
+              @on-select-template="toggleWaTemplate"
+              @on-send="onSendWhatsAppReply"
+            />
+            <label v-else :class="{ error: $v.message.$error }">
+              {{ $t('NEW_CONVERSATION.FORM.MESSAGE.LABEL') }}
+              <textarea
+                v-model="message"
+                class="min-h-[5rem]"
+                type="text"
+                :placeholder="$t('NEW_CONVERSATION.FORM.MESSAGE.PLACEHOLDER')"
+                @input="$v.message.$touch"
+              />
+              <span v-if="$v.message.$error" class="message">
+                {{ $t('NEW_CONVERSATION.FORM.MESSAGE.ERROR') }}
+              </span>
+            </label>
+            <div v-if="isEmailOrWebWidgetInbox" class="flex flex-col">
+              <file-upload
+                ref="uploadAttachment"
+                input-id="newConversationAttachment"
+                :size="4096 * 4096"
+                :accept="allowedFileTypes"
+                :multiple="true"
+                :drop="true"
+                :drop-directory="false"
+                :data="{
+                  direct_upload_url: '/rails/active_storage/direct_uploads',
+                  direct_upload: true,
+                }"
+                @input-file="onFileUpload"
+              >
+                <woot-button
+                  class-names="button--upload"
+                  icon="attach"
+                  emoji="📎"
+                  color-scheme="secondary"
+                  variant="smooth"
+                  size="small"
+                >
+                  {{ $t('NEW_CONVERSATION.FORM.ATTACHMENTS.SELECT') }}
+                </woot-button>
+                <span
+                  class="text-slate-500 ltr:ml-1 rtl:mr-1 font-medium text-xs dark:text-slate-400"
+                >
+                  {{ $t('NEW_CONVERSATION.FORM.ATTACHMENTS.HELP_TEXT') }}
+                </span>
+              </file-upload>
+              <div
+                v-if="hasAttachments"
+                class="max-h-20 overflow-y-auto mb-4 mt-1.5"
+              >
+                <attachment-preview
+                  class="[&>.preview-item]:dark:bg-slate-700 flex-row flex-wrap gap-x-3 gap-y-1"
+                  :attachments="attachedFiles"
+                  :remove-attachment="removeAttachment"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-
-    <div
-      v-if="!hasWhatsappTemplates"
-      class="flex flex-row justify-end gap-2 py-2 px-0 w-full"
-    >
-      <button class="button clear" @click.prevent="onCancel">
-        {{ $t('NEW_CONVERSATION.FORM.CANCEL') }}
-      </button>
-      <woot-button type="submit" :is-loading="conversationsUiFlags.isCreating">
-        {{ $t('NEW_CONVERSATION.FORM.SUBMIT') }}
-      </woot-button>
-    </div>
-
-    <transition v-if="isEmailOrWebWidgetInbox" name="modal-fade">
       <div
-        v-show="$refs.uploadAttachment && $refs.uploadAttachment.dropActive"
-        class="flex top-0 bottom-0 z-30 gap-2 right-0 left-0 items-center justify-center flex-col absolute w-full h-full bg-white/80 dark:bg-slate-700/80"
+        v-if="!hasWhatsappTemplates"
+        class="flex flex-row justify-end gap-2 py-2 px-0 w-full"
       >
-        <fluent-icon icon="cloud-backup" size="40" />
-        <h4 class="page-sub-title text-slate-600 dark:text-slate-200">
-          {{ $t('CONVERSATION.REPLYBOX.DRAG_DROP') }}
-        </h4>
+        <button class="button clear" @click.prevent="onCancel">
+          {{ $t('NEW_CONVERSATION.FORM.CANCEL') }}
+        </button>
+        <woot-button
+          type="submit"
+          :is-loading="conversationsUiFlags.isCreating"
+        >
+          {{ $t('NEW_CONVERSATION.FORM.SUBMIT') }}
+        </woot-button>
       </div>
-    </transition>
-  </form>
+      <transition v-if="isEmailOrWebWidgetInbox" name="modal-fade">
+        <div
+          v-show="$refs.uploadAttachment && $refs.uploadAttachment.dropActive"
+          class="flex top-0 bottom-0 z-30 gap-2 right-0 left-0 items-center justify-center flex-col absolute w-full h-full bg-white/80 dark:bg-slate-700/80"
+        >
+          <fluent-icon icon="cloud-backup" size="40" />
+          <h4 class="page-sub-title text-slate-600 dark:text-slate-200">
+            {{ $t('CONVERSATION.REPLYBOX.DRAG_DROP') }}
+          </h4>
+        </div>
+      </transition>
+    </form>
+
+    <div class="w-full pt-4 px-8 pb-8">
+      <div class="w-full">
+        <div class="relative" />
+        <label>
+          Import Contacts
+          <input type="file" @change="handleFileChange" />
+        </label>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -445,6 +458,36 @@ export default {
     this.setWhatsappContacts();
   },
   methods: {
+    handleFileChange(event) {
+      const file = event.target.files[0];
+      if (file) {
+        this.readAndParseCSV(file);
+      }
+    },
+    readAndParseCSV(file) {
+      const reader = new FileReader();
+
+      reader.onload = e => {
+        const content = e.target.result;
+        this.parseCSV(content);
+      };
+
+      reader.readAsText(file);
+    },
+
+    parseCSV(content) {
+      const lines = content.split('\n');
+      const headers = lines[0].split(',');
+      for (let i = 1; i < lines.length; i += 1) {
+        const values = lines[i].split(',');
+        const contactObject = {};
+        for (let j = 0; j < headers.length; j += 1) {
+          contactObject[headers[j].trim()] = values[j].trim();
+        }
+        this.selectedContacts.push(contactObject);
+      }
+    },
+
     addContact(newValue) {
       this.whatsappContacts.push(newValue);
       this.selectedContacts.push(newValue);
