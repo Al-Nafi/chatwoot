@@ -237,7 +237,7 @@
       <div class="w-full">
         <div class="relative" />
         <label>
-          Import Contacts
+          Import Contacts (2)
           <input type="file" @change="handleFileChange" />
         </label>
       </div>
