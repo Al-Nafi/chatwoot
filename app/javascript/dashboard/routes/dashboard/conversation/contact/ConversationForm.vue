@@ -484,6 +484,7 @@ export default {
         for (let j = 0; j < headers.length; j += 1) {
           contactObject[headers[j].trim()] = values[j].trim();
         }
+        contactObject.phone_number = "+" + contactObject.phone_number
         this.whatsappContacts.push(contactObject);
         this.selectedContacts.push(contactObject);
       }
